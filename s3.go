@@ -43,7 +43,7 @@ type S3Object struct {
 	LastModified time.Time
 }
 
-func NewS3Watcher(c interface{}) (Watcher, error) {
+func newS3Watcher(c interface{}) (Watcher, error) {
 	var config *S3Configuration
 	var ok bool
 	if config, ok = c.(*S3Configuration); !ok {
@@ -128,7 +128,7 @@ func (u *S3Watcher) sync() {
 
 	fileList := make(map[string]*S3Object, 0)
 
-	err := u.EnumerateFiles(u.config.BucketName, u.watchDir, func(page int64, obj *ObjectInfo) bool {
+	err := u.enumerateFiles(u.config.BucketName, u.watchDir, func(page int64, obj *ObjectInfo) bool {
 		// Get Info from S3 object
 		upd, err := u.getInfoFromObject(obj)
 		if err != nil {
@@ -240,7 +240,7 @@ func (u *S3Watcher) getInfoFromObject(obj *ObjectInfo) (*S3Object, error) {
 	return upd, nil
 }
 
-func (u *S3Watcher) EnumerateFiles(bucket, prefix string, callback func(page int64, object *ObjectInfo) bool) error {
+func (u *S3Watcher) enumerateFiles(bucket, prefix string, callback func(page int64, object *ObjectInfo) bool) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
@@ -266,5 +266,5 @@ func (u *S3Watcher) EnumerateFiles(bucket, prefix string, callback func(page int
 }
 
 func init() {
-	supportedServices["s3"] = NewS3Watcher
+	supportedServices["s3"] = newS3Watcher
 }
