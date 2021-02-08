@@ -14,13 +14,13 @@ func main() {
 	}
 
 	config := map[string]string{
-		"bucketname":      "test.storage",
-		"Endpoint":        "127.0.0.1:9000",
-		"AccessKey":       "minio",
-		"SecretAccessKey": "minio123",
-		"SessionToken":    "",
-		"Region":          "",
-		"SSLEnabled":      "false",
+		"bucketname": "test.storage",
+		"endpoint":   "127.0.0.1:9000",
+		"accessKey":  "minio",
+		"secretkey":  "minio123",
+		"token":      "",
+		"region":     "",
+		"sslenabled": "false",
 	}
 	err = s.SetConfig(config)
 	if err != nil {
@@ -36,22 +36,13 @@ func main() {
 
 	err = s.Start()
 	defer s.Close()
-
-	go func() {
-		for v := range s.GetEvents() {
+	for {
+		select {
+		case v := <-s.GetEvents():
 			fmt.Printf("EVENT: %s %s\n", v.Key, v.TypeString())
-		}
-		fmt.Println("exiting events")
-	}()
 
-	go func() {
-		for e := range s.GetErrors() {
+		case e := <-s.GetErrors():
 			fmt.Printf("ERROR: %#v\n", e)
 		}
-		fmt.Println("exiting errors")
-	}()
-
-	time.Sleep(10*time.Second)
-	s.Close()
-	time.Sleep(20*time.Second)
+	}
 }

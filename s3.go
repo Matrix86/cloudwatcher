@@ -13,6 +13,7 @@ import (
 )
 
 type Bool bool
+
 func (bit *Bool) UnmarshalJSON(b []byte) error {
 	txt := string(b)
 	*bit = Bool(txt == "1" || txt == "true")
@@ -21,13 +22,13 @@ func (bit *Bool) UnmarshalJSON(b []byte) error {
 
 type objectInfo = minio.ObjectInfo
 type S3Configuration struct {
-	BucketName      string
-	Endpoint        string
-	AccessKey       string
-	SecretAccessKey string
-	SessionToken    string
-	Region          string
-	SSLEnabled      Bool
+	BucketName      string `json:"bucketname"`
+	Endpoint        string `json:"endpoint"`
+	AccessKey       string `json:"accesskey"`
+	SecretAccessKey string `json:"secretkey"`
+	SessionToken    string `json:"token"`
+	Region          string `json:"region"`
+	SSLEnabled      Bool   `json:"sslenabled"`
 }
 
 type S3Watcher struct {
@@ -57,8 +58,8 @@ func newS3Watcher(dir string, interval time.Duration) (Watcher, error) {
 		config: nil,
 		stop:   make(chan bool, 1),
 		WatcherBase: WatcherBase{
-			Events: make(chan Event, 100),
-			Errors: make(chan error, 100),
+			Events:      make(chan Event, 100),
+			Errors:      make(chan error, 100),
 			watchDir:    dir,
 			pollingTime: interval,
 		},
