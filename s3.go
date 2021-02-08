@@ -26,7 +26,7 @@ type S3Configuration struct {
 type S3Watcher struct {
 	WatcherBase
 
-	synching uint32
+	syncing uint32
 
 	ticker *time.Ticker
 	stop   chan bool
@@ -86,6 +86,7 @@ func (u *S3Watcher) Start() {
 }
 
 func (u *S3Watcher) Close() {
+	u.stop <- true
 }
 
 func (u *S3Watcher) getCachedObject(o *S3Object) *S3Object {
@@ -115,10 +116,10 @@ func (u *S3Object) AreTagsChanged(new *S3Object) bool {
 
 func (u *S3Watcher) sync() {
 	// allow only one sync at same time
-	if !atomic.CompareAndSwapUint32(&u.synching, 0, 1) {
+	if !atomic.CompareAndSwapUint32(&u.syncing, 0, 1) {
 		return
 	}
-	defer atomic.StoreUint32(&u.synching, 0)
+	defer atomic.StoreUint32(&u.syncing, 0)
 
 	// Avoid to delete all the things if the updater env is not ready...
 	if u.isConnected() == false {
