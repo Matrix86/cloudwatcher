@@ -14,3 +14,18 @@ const (
 	FileDeleted
 	TagsChanged
 )
+
+func (e *Event) TypeString() string {
+	switch e.Type {
+	case FileCreated:
+		return "FileCreated"
+	case FileChanged:
+		return "FileChanged"
+	case FileDeleted:
+		return "FileDeleted"
+	case TagsChanged:
+		return "TagsChanged"
+	default:
+		return "unknown"
+	}
+}

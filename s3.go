@@ -2,6 +2,7 @@ package cloudwatcher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -11,16 +12,22 @@ import (
 	"github.com/minio/minio-go/pkg/credentials"
 )
 
-type ObjectInfo = minio.ObjectInfo
+type Bool bool
+func (bit *Bool) UnmarshalJSON(b []byte) error {
+	txt := string(b)
+	*bit = Bool(txt == "1" || txt == "true")
+	return nil
+}
+
+type objectInfo = minio.ObjectInfo
 type S3Configuration struct {
 	BucketName      string
-	Environment     string
 	Endpoint        string
 	AccessKey       string
 	SecretAccessKey string
 	SessionToken    string
 	Region          string
-	SSLEnabled      bool
+	SSLEnabled      Bool
 }
 
 type S3Watcher struct {
@@ -43,32 +50,56 @@ type S3Object struct {
 	LastModified time.Time
 }
 
-func newS3Watcher(c interface{}) (Watcher, error) {
-	var config *S3Configuration
-	var ok bool
-	if config, ok = c.(*S3Configuration); !ok {
-		return nil, fmt.Errorf("configuration is not a S3Configuration object")
-	}
+func newS3Watcher(dir string, interval time.Duration) (Watcher, error) {
 
 	upd := &S3Watcher{
 		cache:  make(map[string]*S3Object),
-		config: config,
+		config: nil,
 		stop:   make(chan bool, 1),
+		WatcherBase: WatcherBase{
+			Events: make(chan Event, 100),
+			Errors: make(chan error, 100),
+			watchDir:    dir,
+			pollingTime: interval,
+		},
 	}
-
-	client, err := minio.New(upd.config.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(upd.config.AccessKey, upd.config.SecretAccessKey, upd.config.SessionToken),
-		Secure: upd.config.SSLEnabled,
-	})
-	if err != nil {
-		return nil, err
-	}
-	upd.client = client
-
 	return upd, nil
 }
 
-func (u *S3Watcher) Start() {
+func (u *S3Watcher) SetConfig(m map[string]string) error {
+	j, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	config := S3Configuration{}
+	if err := json.Unmarshal(j, &config); err != nil {
+		return err
+	}
+	u.config = &config
+
+	client, err := minio.New(u.config.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(u.config.AccessKey, u.config.SecretAccessKey, u.config.SessionToken),
+		Secure: bool(u.config.SSLEnabled),
+	})
+	if err != nil {
+		return err
+	}
+	u.client = client
+	return nil
+}
+
+func (u *S3Watcher) Start() error {
+	if u.config == nil {
+		return fmt.Errorf("configuration for S3 needed")
+	}
+
+	if ok, err := u.bucketExists(u.config.BucketName); err != nil {
+		return fmt.Errorf("error on checking the bucket: %s", err)
+	} else if !ok {
+		return fmt.Errorf("error on checking the bucket: bucket %s not exists", u.config.BucketName)
+	}
+
 	u.ticker = time.NewTicker(u.pollingTime)
 	go func() {
 		// launch synchronization also the first time
@@ -83,6 +114,7 @@ func (u *S3Watcher) Start() {
 			}
 		}
 	}()
+	return nil
 }
 
 func (u *S3Watcher) Close() {
@@ -96,7 +128,7 @@ func (u *S3Watcher) getCachedObject(o *S3Object) *S3Object {
 	return nil
 }
 
-func (u *S3Object) AreTagsChanged(new *S3Object) bool {
+func (u *S3Object) areTagsChanged(new *S3Object) bool {
 	// Check if tags are changed
 	if len(u.Tags) != len(new.Tags) {
 		return true
@@ -128,7 +160,8 @@ func (u *S3Watcher) sync() {
 
 	fileList := make(map[string]*S3Object, 0)
 
-	err := u.enumerateFiles(u.config.BucketName, u.watchDir, func(page int64, obj *ObjectInfo) bool {
+	err := u.enumerateFiles(u.config.BucketName, u.watchDir, func(page int64, obj *objectInfo) bool {
+
 		// Get Info from S3 object
 		upd, err := u.getInfoFromObject(obj)
 		if err != nil {
@@ -140,7 +173,7 @@ func (u *S3Watcher) sync() {
 
 		// Check if the object is cached by Key
 		cached := u.getCachedObject(upd)
-		// Object has been cached previously but we need to check its tags
+		// Object has been cached previously by Key
 		if cached != nil {
 			// Check if the LastModified has been changed
 			if !cached.LastModified.Equal(upd.LastModified) {
@@ -152,7 +185,7 @@ func (u *S3Watcher) sync() {
 				u.Events <- event
 			}
 			// Check if the tags have been updated
-			if cached.AreTagsChanged(upd) {
+			if cached.areTagsChanged(upd) {
 				event := Event{
 					Key:    upd.Key,
 					Type:   TagsChanged,
@@ -169,6 +202,7 @@ func (u *S3Watcher) sync() {
 			u.Events <- event
 		}
 		u.cache[upd.Key] = upd
+
 		return true
 	})
 	if err != nil {
@@ -218,7 +252,7 @@ func (u *S3Watcher) isConnected() bool {
 	return found
 }
 
-func (u *S3Watcher) getInfoFromObject(obj *ObjectInfo) (*S3Object, error) {
+func (u *S3Watcher) getInfoFromObject(obj *objectInfo) (*S3Object, error) {
 	var upd *S3Object
 
 	tags, err := u.getTags(obj.Key, u.config.BucketName)
@@ -240,7 +274,7 @@ func (u *S3Watcher) getInfoFromObject(obj *ObjectInfo) (*S3Object, error) {
 	return upd, nil
 }
 
-func (u *S3Watcher) enumerateFiles(bucket, prefix string, callback func(page int64, object *ObjectInfo) bool) error {
+func (u *S3Watcher) enumerateFiles(bucket, prefix string, callback func(page int64, object *objectInfo) bool) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
@@ -257,7 +291,7 @@ func (u *S3Watcher) enumerateFiles(bucket, prefix string, callback func(page int
 			continue
 		}
 
-		obj := ObjectInfo(object)
+		obj := objectInfo(object)
 		if callback(0, &obj) == false {
 			break
 		}

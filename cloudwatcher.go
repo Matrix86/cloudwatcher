@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type storageFunc func(config interface{}) (Watcher, error)
+type storageFunc func(dir string, interval time.Duration) (Watcher, error)
 var supportedServices map[string]storageFunc
 
 type WatcherBase struct {
@@ -17,16 +17,27 @@ type WatcherBase struct {
 }
 
 type Watcher interface {
-	Start()
+	Start() error
+	SetConfig(c map[string]string) error
 	Close()
+	GetEvents() chan Event
+	GetErrors() chan error
 }
 
-func New(service string, config interface{}) (Watcher, error) {
+func New(service string, dir string, interval time.Duration) (Watcher, error) {
 	if f, ok := supportedServices[service]; !ok {
-		return nil, fmt.Errorf("service %s is not yet supported")
+		return nil, fmt.Errorf("service %s is not yet supported", service)
 	} else {
-		return f(config)
+		return f(dir, interval)
 	}
+}
+
+func (w *WatcherBase) GetEvents() chan Event {
+	return w.Events
+}
+
+func (w *WatcherBase) GetErrors() chan error {
+	return w.Errors
 }
 
 func init() {
