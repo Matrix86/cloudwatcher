@@ -41,13 +41,17 @@ func main() {
 		for v := range s.GetEvents() {
 			fmt.Printf("EVENT: %s %s\n", v.Key, v.TypeString())
 		}
+		fmt.Println("exiting events")
 	}()
 
 	go func() {
 		for e := range s.GetErrors() {
 			fmt.Printf("ERROR: %#v\n", e)
 		}
+		fmt.Println("exiting errors")
 	}()
 
-	time.Sleep(30*time.Second)
+	time.Sleep(10*time.Second)
+	s.Close()
+	time.Sleep(20*time.Second)
 }

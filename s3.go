@@ -110,6 +110,8 @@ func (u *S3Watcher) Start() error {
 				u.sync()
 
 			case <-u.stop:
+				close(u.Events)
+				close(u.Errors)
 				return
 			}
 		}
