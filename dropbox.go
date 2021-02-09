@@ -8,7 +8,6 @@ import (
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/dropbox"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/dropbox/files"
-	"github.com/minio/minio-go"
 )
 
 type DropboxWatcher struct {
@@ -19,7 +18,6 @@ type DropboxWatcher struct {
 	ticker *time.Ticker
 	stop   chan bool
 	config *DropboxConfiguration
-	client *minio.Client
 	cache  map[string]*DropboxObject
 }
 
