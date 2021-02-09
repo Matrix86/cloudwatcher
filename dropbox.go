@@ -29,8 +29,10 @@ type DropboxObject struct {
 }
 
 type DropboxConfiguration struct {
-	Debug     Bool   `json:"debug"`
-	Token     string `json:"token"`
+	Debug        Bool   `json:"debug"`
+	Token        string `json:"token"`
+	ClientId     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
 }
 
 func newDropboxWatcher(dir string, interval time.Duration) (Watcher, error) {
@@ -64,7 +66,6 @@ func (w *DropboxWatcher) SetConfig(m map[string]string) error {
 		return fmt.Errorf("token not specified")
 	}
 	w.config = &config
-
 
 	fmt.Printf("%v", config)
 	return nil
@@ -216,10 +217,6 @@ func (w *DropboxWatcher) enumerateFiles(prefix string, callback func(object *Dro
 			o.LastModified = f.ServerModified
 			o.Hash = f.ContentHash
 			callback(o)
-			//case *files.FolderMetadata:
-			//	o.Key = f.PathDisplay
-			//	o.Size = 0
-			//	o.LastModified = 0
 		}
 	}
 

@@ -9,10 +9,16 @@ import (
 	"time"
 )
 
+const (
+	ClientId     = "ZZZZZZ"
+	ClientSecret = "YYYYYY"
+	Token        = "XXXXXX"
+)
+
 func getAuthCode() (string, error) {
 	conf := &oauth2.Config{
-		ClientID:     "CLIENT_ID_HERE",
-		ClientSecret: "CLIENT_SECRET_HERE",
+		ClientID:     ClientId,
+		ClientSecret: ClientSecret,
 		Endpoint:     dropbox.OAuthEndpoint(""),
 	}
 
@@ -41,11 +47,11 @@ func main() {
 	}
 
 	config := map[string]string{
-		"debug":     "true",
-		"token":     "",
+		"debug": "true",
+		"token": Token,
 	}
 
-	if v, ok := config["token"]; !ok ||  v == "" {
+	if v, ok := config["token"]; !ok || v == "" {
 		token, err := getAuthCode()
 		if err != nil {
 			fmt.Printf("ERROR: %s", err)
