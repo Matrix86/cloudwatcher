@@ -12,14 +12,6 @@ import (
 	"github.com/minio/minio-go/pkg/credentials"
 )
 
-type Bool bool
-
-func (bit *Bool) UnmarshalJSON(b []byte) error {
-	txt := string(b)
-	*bit = Bool(txt == "1" || txt == "true")
-	return nil
-}
-
 type objectInfo = minio.ObjectInfo
 type S3Configuration struct {
 	BucketName      string `json:"bucketname"`
@@ -209,6 +201,7 @@ func (u *S3Watcher) sync() {
 		return true
 	})
 	if err != nil {
+		u.Errors <- err
 		return
 	}
 
