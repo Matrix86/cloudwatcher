@@ -28,12 +28,6 @@ func main() {
 		return
 	}
 
-	err = s.SetConfig(config)
-	if err != nil {
-		fmt.Printf("ERROR: %s", err)
-		return
-	}
-
 	err = s.Start()
 	defer s.Close()
 	for {
