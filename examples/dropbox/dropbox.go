@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/Matrix86/cloudwatcher"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/dropbox"
@@ -10,9 +11,9 @@ import (
 )
 
 const (
-	ClientId     = "ZZZZZZ"
-	ClientSecret = "YYYYYY"
-	Token        = "XXXXXX"
+	ClientId     = ""
+	ClientSecret = ""
+	Token        = ""
 )
 
 func getAuthCode() (string, error) {
@@ -37,7 +38,12 @@ func getAuthCode() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return token.AccessToken, nil
+
+	b, err := json.Marshal(token)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 func main() {
 	s, err := cloudwatcher.New("dropbox", "", 2*time.Second)
