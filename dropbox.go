@@ -8,6 +8,7 @@ import (
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/dropbox"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/dropbox/files"
+	"golang.org/x/oauth2"
 )
 
 type DropboxWatcher struct {
@@ -30,9 +31,11 @@ type DropboxObject struct {
 
 type DropboxConfiguration struct {
 	Debug        Bool   `json:"debug"`
-	Token        string `json:"token"`
+	JToken       string `json:"token"`
 	ClientId     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
+
+	token *oauth2.Token
 }
 
 func newDropboxWatcher(dir string, interval time.Duration) (Watcher, error) {
@@ -62,12 +65,16 @@ func (w *DropboxWatcher) SetConfig(m map[string]string) error {
 		return err
 	}
 
-	if config.Token == "" {
+	if config.JToken == "" {
 		return fmt.Errorf("token not specified")
 	}
 	w.config = &config
 
-	fmt.Printf("%v", config)
+	tok := &oauth2.Token{}
+	if err := json.Unmarshal([]byte(config.JToken), tok); err != nil {
+		return err
+	}
+	w.config.token = tok
 	return nil
 }
 
@@ -161,14 +168,8 @@ func (w *DropboxWatcher) enumerateFiles(prefix string, callback func(object *Dro
 	}
 
 	config := dropbox.Config{
-		Token:           w.config.Token,
-		LogLevel:        logLevel,
-		Logger:          nil,
-		AsMemberID:      "",
-		Domain:          "",
-		Client:          nil,
-		HeaderGenerator: nil,
-		URLGenerator:    nil,
+		Token:    w.config.token.AccessToken,
+		LogLevel: logLevel,
 	}
 	dbx := files.New(config)
 	arg := files.NewListFolderArg(prefix)
