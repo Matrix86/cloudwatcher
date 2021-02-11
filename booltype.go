@@ -1,9 +1,17 @@
 package cloudwatcher
 
+import (
+	"encoding/json"
+)
+
 type Bool bool
 
 func (bit *Bool) UnmarshalJSON(b []byte) error {
-	txt := string(b)
+	var txt string
+	err := json.Unmarshal(b, &txt)
+	if err != nil {
+		return err
+	}
 	*bit = Bool(txt == "1" || txt == "true")
 	return nil
 }
