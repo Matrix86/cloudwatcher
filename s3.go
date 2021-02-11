@@ -14,13 +14,13 @@ import (
 
 type objectInfo = minio.ObjectInfo
 type S3Configuration struct {
-	BucketName      string `json:"bucketname"`
+	BucketName      string `json:"bucket_name"`
 	Endpoint        string `json:"endpoint"`
-	AccessKey       string `json:"accesskey"`
-	SecretAccessKey string `json:"secretkey"`
+	AccessKey       string `json:"access_key"`
+	SecretAccessKey string `json:"secret_key"`
 	SessionToken    string `json:"token"`
 	Region          string `json:"region"`
-	SSLEnabled      Bool   `json:"sslenabled"`
+	SSLEnabled      Bool   `json:"ssl_enabled"`
 }
 
 type S3Watcher struct {
@@ -212,7 +212,7 @@ func (u *S3Watcher) sync() {
 			event := Event{
 				Key:    o.Key,
 				Type:   FileDeleted,
-				Object: nil,
+				Object: o,
 			}
 			u.Events <- event
 		}

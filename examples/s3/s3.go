@@ -14,13 +14,13 @@ func main() {
 	}
 
 	config := map[string]string{
-		"bucketname": "test.storage",
+		"bucket_name": "test.storage",
 		"endpoint":   "127.0.0.1:9000",
-		"accessKey":  "minio",
-		"secretkey":  "minio123",
+		"access_key":  "minio",
+		"secret_key":  "minio123",
 		"token":      "",
 		"region":     "",
-		"sslenabled": "false",
+		"ssl_enabled": "false",
 	}
 	err = s.SetConfig(config)
 	if err != nil {
