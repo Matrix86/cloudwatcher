@@ -13,7 +13,7 @@ import (
 )
 
 type objectInfo = minio.ObjectInfo
-type S3Configuration struct {
+type s3Configuration struct {
 	BucketName      string `json:"bucket_name"`
 	Endpoint        string `json:"endpoint"`
 	AccessKey       string `json:"access_key"`
@@ -23,6 +23,7 @@ type S3Configuration struct {
 	SSLEnabled      Bool   `json:"ssl_enabled"`
 }
 
+// S3Watcher is the specialized watcher for Amazon S3 service
 type S3Watcher struct {
 	WatcherBase
 
@@ -30,11 +31,12 @@ type S3Watcher struct {
 
 	ticker *time.Ticker
 	stop   chan bool
-	config *S3Configuration
-	client *minio.Client
+	config *s3Configuration
+	client IMinio
 	cache  map[string]*S3Object
 }
 
+// S3Object is the object that contains the info of the file
 type S3Object struct {
 	Key          string
 	Etag         string
@@ -44,7 +46,6 @@ type S3Object struct {
 }
 
 func newS3Watcher(dir string, interval time.Duration) (Watcher, error) {
-
 	upd := &S3Watcher{
 		cache:  make(map[string]*S3Object),
 		config: nil,
@@ -59,13 +60,14 @@ func newS3Watcher(dir string, interval time.Duration) (Watcher, error) {
 	return upd, nil
 }
 
+// SetConfig is used to configure the S3Watcher
 func (u *S3Watcher) SetConfig(m map[string]string) error {
 	j, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 
-	config := S3Configuration{}
+	config := s3Configuration{}
 	if err := json.Unmarshal(j, &config); err != nil {
 		return err
 	}
@@ -82,6 +84,7 @@ func (u *S3Watcher) SetConfig(m map[string]string) error {
 	return nil
 }
 
+// Start launches the polling process
 func (u *S3Watcher) Start() error {
 	if u.config == nil {
 		return fmt.Errorf("configuration for S3 needed")
@@ -112,8 +115,11 @@ func (u *S3Watcher) Start() error {
 	return nil
 }
 
+// Close stop the polling process
 func (u *S3Watcher) Close() {
-	u.stop <- true
+	if u.stop != nil {
+		u.stop <- true
+	}
 }
 
 func (u *S3Watcher) getCachedObject(o *S3Object) *S3Object {
@@ -148,15 +154,14 @@ func (u *S3Watcher) sync() {
 	}
 	defer atomic.StoreUint32(&u.syncing, 0)
 
-	// Avoid to delete all the things if the updater env is not ready...
-	if u.isConnected() == false {
+	if found, err := u.bucketExists(u.config.BucketName); found == false || err != nil {
+		u.Errors <- fmt.Errorf("bucket '%s' not found: %s", u.config.BucketName, err)
 		return
 	}
 
 	fileList := make(map[string]*S3Object, 0)
 
 	err := u.enumerateFiles(u.config.BucketName, u.watchDir, func(page int64, obj *objectInfo) bool {
-
 		// Get Info from S3 object
 		upd, err := u.getInfoFromObject(obj)
 		if err != nil {
@@ -171,7 +176,7 @@ func (u *S3Watcher) sync() {
 		// Object has been cached previously by Key
 		if cached != nil {
 			// Check if the LastModified has been changed
-			if !cached.LastModified.Equal(upd.LastModified) {
+			if !cached.LastModified.Equal(upd.LastModified) || cached.Size != upd.Size {
 				event := Event{
 					Key:    upd.Key,
 					Type:   FileChanged,
@@ -271,24 +276,22 @@ func (u *S3Watcher) getInfoFromObject(obj *objectInfo) (*S3Object, error) {
 }
 
 func (u *S3Watcher) enumerateFiles(bucket, prefix string, callback func(page int64, object *objectInfo) bool) error {
-	doneCh := make(chan struct{})
-	defer close(doneCh)
-
-	// List all objects from a bucket-name with a matching prefix.
-	for object := range u.client.ListObjects(context.Background(), bucket, minio.ListObjectsOptions{
+	options := minio.ListObjectsOptions{
 		WithVersions: false,
 		WithMetadata: false,
 		Prefix:       prefix,
 		Recursive:    true,
 		MaxKeys:      0,
 		UseV1:        false,
-	}) {
+	}
+
+	// List all objects from a bucket-name with a matching prefix.
+	for object := range u.client.ListObjects(context.Background(), bucket, options) {
 		if object.Err != nil {
 			continue
 		}
 
-		obj := objectInfo(object)
-		if callback(0, &obj) == false {
+		if callback(0, &object) == false {
 			break
 		}
 	}

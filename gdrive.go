@@ -14,6 +14,7 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
+// GDriveWatcher is the specialized watcher for Google Drive service
 type GDriveWatcher struct {
 	WatcherBase
 
@@ -21,24 +22,26 @@ type GDriveWatcher struct {
 
 	ticker *time.Ticker
 	stop   chan bool
-	config *GDriveConfiguration
+	config *gDriveConfiguration
 	cache  map[string]*GDriveObject
+	client *drive.Service
 }
 
+// GDriveObject is the object that contains the info of the file
 type GDriveObject struct {
-	Id           string
+	ID           string
 	Key          string
 	Size         int64
 	LastModified time.Time
 	Hash         string
 }
 
-type GDriveConfiguration struct {
+type gDriveConfiguration struct {
 	Debug        Bool   `json:"debug"`
 	JToken       string `json:"token"`
-	ClientId     string `json:"client_id"`
+	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
-	ApiKey       string `json:"api_key"`
+	APIKey       string `json:"api_key"`
 
 	token *oauth2.Token
 }
@@ -58,18 +61,19 @@ func newGDriveWatcher(dir string, interval time.Duration) (Watcher, error) {
 	return w, nil
 }
 
+// SetConfig is used to configure the GDriveWatcher
 func (w *GDriveWatcher) SetConfig(m map[string]string) error {
 	j, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 
-	config := GDriveConfiguration{}
+	config := gDriveConfiguration{}
 	if err := json.Unmarshal(j, &config); err != nil {
 		return err
 	}
 
-	if config.JToken == "" && config.ApiKey == "" {
+	if config.JToken == "" && config.APIKey == "" {
 		return fmt.Errorf("token or api_key have to be set")
 	}
 	w.config = &config
@@ -82,6 +86,7 @@ func (w *GDriveWatcher) SetConfig(m map[string]string) error {
 	return nil
 }
 
+// Start launches the polling process
 func (w *GDriveWatcher) Start() error {
 	if w.config == nil {
 		return fmt.Errorf("configuration for Dropbox needed")
@@ -106,8 +111,11 @@ func (w *GDriveWatcher) Start() error {
 	return nil
 }
 
+// Close stop the polling process
 func (w *GDriveWatcher) Close() {
-	w.stop <- true
+	if w.stop != nil {
+		w.stop <- true
+	}
 }
 
 func (w *GDriveWatcher) sync() {
@@ -121,7 +129,7 @@ func (w *GDriveWatcher) sync() {
 
 	err := w.enumerateFiles(w.watchDir, func(obj *GDriveObject) bool {
 		// Store the files to check the deleted one
-		fileList[obj.Id] = obj
+		fileList[obj.ID] = obj
 		// Check if the object is cached by Key
 		cached := w.getCachedObject(obj)
 		// Object has been cached previously by Key
@@ -144,7 +152,7 @@ func (w *GDriveWatcher) sync() {
 			}
 			w.Events <- event
 		}
-		w.cache[obj.Id] = obj
+		w.cache[obj.ID] = obj
 		return true
 	})
 	if err != nil {
@@ -168,12 +176,12 @@ func (w *GDriveWatcher) sync() {
 
 func (w *GDriveWatcher) resolveParents(file *drive.File, list map[string]*drive.File) [][]string {
 	paths := make([][]string, len(file.Parents))
-	for i, _ := range paths {
+	for i := range paths {
 		paths[i] = make([]string, 0)
 		paths[i] = append(paths[i], file.Name)
 	}
-	for i, parentId := range file.Parents {
-		if v, ok := list[parentId]; !ok {
+	for i, parentID := range file.Parents {
+		if v, ok := list[parentID]; !ok {
 			continue
 		} else {
 			for _, ppath := range w.resolveParents(v, list) {
@@ -193,9 +201,10 @@ func (w *GDriveWatcher) getFullPaths(file *drive.File, list map[string]*drive.Fi
 	return paths
 }
 
-func (w *GDriveWatcher) enumerateFiles(prefix string, callback func(object *GDriveObject) bool) error {
+func (w *GDriveWatcher) initDriverClient() {
+	var err error
 	config := &oauth2.Config{
-		ClientID:     w.config.ClientId,
+		ClientID:     w.config.ClientID,
 		ClientSecret: w.config.ClientSecret,
 		Scopes:       []string{drive.DriveMetadataReadonlyScope},
 		Endpoint:     google.Endpoint,
@@ -204,18 +213,24 @@ func (w *GDriveWatcher) enumerateFiles(prefix string, callback func(object *GDri
 	var opt option.ClientOption
 	if w.config.token != nil {
 		opt = option.WithTokenSource(config.TokenSource(context.Background(), w.config.token))
-	} else if w.config.ApiKey != "" {
-		opt = option.WithAPIKey(w.config.ApiKey)
+	} else if w.config.APIKey != "" {
+		opt = option.WithAPIKey(w.config.APIKey)
 	}
 
-	srv, err := drive.NewService(context.Background(), opt)
+	w.client, err = drive.NewService(context.Background(), opt)
 	if err != nil {
-		return fmt.Errorf("unable to retrieve Drive client: %v", err)
+		w.Errors <- fmt.Errorf("unable to retrieve Drive client: %v", err)
+	}
+}
+
+func (w *GDriveWatcher) enumerateFiles(prefix string, callback func(object *GDriveObject) bool) error {
+	if w.client == nil {
+		w.initDriverClient()
 	}
 
 	fileList := make(map[string]*drive.File)
 
-	err = srv.Files.List().Fields("nextPageToken, files(id, name, mimeType, modifiedTime, parents, size, md5Checksum, trashed)").Pages(context.Background(), func(files *drive.FileList) error {
+	err := w.client.Files.List().Fields("nextPageToken, files(id, name, mimeType, modifiedTime, parents, size, md5Checksum, trashed)").Pages(context.Background(), func(files *drive.FileList) error {
 		for _, f := range files.Files {
 			fileList[f.Id] = f
 		}
@@ -236,7 +251,7 @@ func (w *GDriveWatcher) enumerateFiles(prefix string, callback func(object *GDri
 				}
 				if strings.HasPrefix(name, prefix) {
 					o := &GDriveObject{
-						Id:           file.Id,
+						ID:           file.Id,
 						Key:          name,
 						Size:         file.Size,
 						LastModified: mt,
@@ -253,7 +268,7 @@ func (w *GDriveWatcher) enumerateFiles(prefix string, callback func(object *GDri
 }
 
 func (w *GDriveWatcher) getCachedObject(o *GDriveObject) *GDriveObject {
-	if cachedObject, ok := w.cache[o.Id]; ok {
+	if cachedObject, ok := w.cache[o.ID]; ok {
 		return cachedObject
 	}
 	return nil

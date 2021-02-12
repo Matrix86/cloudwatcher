@@ -3,6 +3,7 @@ package cloudwatcher
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"sync/atomic"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// DropboxWatcher is the specialized watcher for Dropbox service
 type DropboxWatcher struct {
 	WatcherBase
 
@@ -18,10 +20,12 @@ type DropboxWatcher struct {
 
 	ticker *time.Ticker
 	stop   chan bool
-	config *DropboxConfiguration
+	config *dropboxConfiguration
 	cache  map[string]*DropboxObject
+	client files.Client
 }
 
+// DropboxObject is the object that contains the info of the file
 type DropboxObject struct {
 	Key          string
 	Size         int64
@@ -29,10 +33,10 @@ type DropboxObject struct {
 	Hash         string
 }
 
-type DropboxConfiguration struct {
+type dropboxConfiguration struct {
 	Debug        Bool   `json:"debug"`
 	JToken       string `json:"token"`
-	ClientId     string `json:"client_id"`
+	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 
 	token *oauth2.Token
@@ -42,6 +46,7 @@ func newDropboxWatcher(dir string, interval time.Duration) (Watcher, error) {
 	w := &DropboxWatcher{
 		cache:  make(map[string]*DropboxObject),
 		config: nil,
+		client: nil,
 		stop:   make(chan bool, 1),
 		WatcherBase: WatcherBase{
 			Events:      make(chan Event, 100),
@@ -54,13 +59,14 @@ func newDropboxWatcher(dir string, interval time.Duration) (Watcher, error) {
 	return w, nil
 }
 
+// SetConfig is used to configure the DropboxWatcher
 func (w *DropboxWatcher) SetConfig(m map[string]string) error {
 	j, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 
-	config := DropboxConfiguration{}
+	config := dropboxConfiguration{}
 	if err := json.Unmarshal(j, &config); err != nil {
 		return err
 	}
@@ -78,6 +84,7 @@ func (w *DropboxWatcher) SetConfig(m map[string]string) error {
 	return nil
 }
 
+// Start launches the polling process
 func (w *DropboxWatcher) Start() error {
 	if w.config == nil {
 		return fmt.Errorf("configuration for Dropbox needed")
@@ -102,8 +109,24 @@ func (w *DropboxWatcher) Start() error {
 	return nil
 }
 
+// Close stop the polling process
 func (w *DropboxWatcher) Close() {
-	w.stop <- true
+	if w.stop != nil {
+		w.stop <- true
+	}
+}
+
+func (w *DropboxWatcher) initDropboxClient() {
+	logLevel := dropbox.LogOff
+	if w.config.Debug {
+		logLevel = dropbox.LogDebug
+	}
+
+	config := dropbox.Config{
+		Token:    w.config.token.AccessToken,
+		LogLevel: logLevel,
+	}
+	w.client = files.New(config)
 }
 
 func (w *DropboxWatcher) sync() {
@@ -113,8 +136,11 @@ func (w *DropboxWatcher) sync() {
 	}
 	defer atomic.StoreUint32(&w.syncing, 0)
 
-	fileList := make(map[string]*DropboxObject, 0)
+	if w.client == nil {
+		w.initDropboxClient()
+	}
 
+	fileList := make(map[string]*DropboxObject, 0)
 	err := w.enumerateFiles(w.watchDir, func(obj *DropboxObject) bool {
 		// Store the files to check the deleted one
 		fileList[obj.Key] = obj
@@ -123,7 +149,7 @@ func (w *DropboxWatcher) sync() {
 		// Object has been cached previously by Key
 		if cached != nil {
 			// Check if the LastModified has been changed
-			if !cached.LastModified.Equal(obj.LastModified) || cached.Hash != obj.Hash {
+			if !cached.LastModified.Equal(obj.LastModified) || cached.Hash != obj.Hash || cached.Size != obj.Size {
 				event := Event{
 					Key:    obj.Key,
 					Type:   FileChanged,
@@ -162,21 +188,11 @@ func (w *DropboxWatcher) sync() {
 }
 
 func (w *DropboxWatcher) enumerateFiles(prefix string, callback func(object *DropboxObject) bool) error {
-	logLevel := dropbox.LogOff
-	if w.config.Debug {
-		logLevel = dropbox.LogDebug
-	}
-
-	config := dropbox.Config{
-		Token:    w.config.token.AccessToken,
-		LogLevel: logLevel,
-	}
-	dbx := files.New(config)
 	arg := files.NewListFolderArg(prefix)
 	arg.Recursive = true
 
 	var entries []files.IsMetadata
-	res, err := dbx.ListFolder(arg)
+	res, err := w.client.ListFolder(arg)
 	if err != nil {
 		listRevisionError, ok := err.(files.ListRevisionsAPIError)
 		if ok {
@@ -184,7 +200,7 @@ func (w *DropboxWatcher) enumerateFiles(prefix string, callback func(object *Dro
 			// get_metadata request for the same path and using that response instead.
 			if listRevisionError.EndpointError.Path.Tag == files.LookupErrorNotFolder {
 				var metaRes files.IsMetadata
-				metaRes, err = w.getFileMetadata(dbx, prefix)
+				metaRes, err = w.getFileMetadata(w.client, prefix)
 				entries = []files.IsMetadata{metaRes}
 			} else {
 				// Return if there's an error other than "not_folder" or if the follow-up
@@ -200,7 +216,7 @@ func (w *DropboxWatcher) enumerateFiles(prefix string, callback func(object *Dro
 		for res.HasMore {
 			arg := files.NewListFolderContinueArg(res.Cursor)
 
-			res, err = dbx.ListFolderContinue(arg)
+			res, err = w.client.ListFolderContinue(arg)
 			if err != nil {
 				return err
 			}
@@ -214,10 +230,14 @@ func (w *DropboxWatcher) enumerateFiles(prefix string, callback func(object *Dro
 		switch f := entry.(type) {
 		case *files.FileMetadata:
 			o.Key = f.PathDisplay
+			if f.PathDisplay == "" {
+				o.Key = path.Join(f.PathLower, f.Name)
+			}
 			o.Size = int64(f.Size)
 			o.LastModified = f.ServerModified
 			o.Hash = f.ContentHash
 			callback(o)
+		default:
 		}
 	}
 

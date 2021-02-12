@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// LocalWatcher is the specialized watcher for the local FS
 type LocalWatcher struct {
 	WatcherBase
 
@@ -18,10 +19,11 @@ type LocalWatcher struct {
 	watcher *fsnotify.Watcher
 	ticker  *time.Ticker
 	stop    chan bool
-	config  *LocalConfiguration
+	config  *localConfiguration
 	cache   map[string]*LocalObject
 }
 
+// LocalObject is the object that contains the info of the file
 type LocalObject struct {
 	Key          string
 	Size         int64
@@ -29,14 +31,14 @@ type LocalObject struct {
 	FileMode     os.FileMode
 }
 
-type LocalConfiguration struct {
+type localConfiguration struct {
 	Debug             Bool `json:"debug"`
 	DisableFsNotify   Bool `json:"disable_fsnotify"`
 }
 
 func newLocalWatcher(dir string, interval time.Duration) (Watcher, error) {
 	w := &LocalWatcher{
-		config: &LocalConfiguration{},
+		config: &localConfiguration{},
 		stop:   make(chan bool, 1),
 		cache:  make(map[string]*LocalObject),
 		WatcherBase: WatcherBase{
@@ -54,13 +56,14 @@ func newLocalWatcher(dir string, interval time.Duration) (Watcher, error) {
 	return w, nil
 }
 
+// SetConfig is used to configure the LocalWatcher
 func (w *LocalWatcher) SetConfig(m map[string]string) error {
 	j, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 
-	config := LocalConfiguration{}
+	config := localConfiguration{}
 	if err := json.Unmarshal(j, &config); err != nil {
 		return err
 	}
@@ -69,6 +72,7 @@ func (w *LocalWatcher) SetConfig(m map[string]string) error {
 	return nil
 }
 
+// Start launches the polling process
 func (w *LocalWatcher) Start() error {
 	if _, err := os.Stat(w.watchDir); os.IsNotExist(err) {
 		return fmt.Errorf("directory '%s' not found", w.watchDir)
@@ -194,6 +198,11 @@ func (w *LocalWatcher) Start() error {
 	return nil
 }
 
+// Close stop the polling process
+func (w *LocalWatcher) Close() {
+	w.stop <- true
+}
+
 func (w *LocalWatcher) sync() {
 	// allow only one sync at same time
 	if !atomic.CompareAndSwapUint32(&w.syncing, 0, 1) {
@@ -314,10 +323,6 @@ func (w *LocalWatcher) rmRecursive(dir string) error {
 		return nil
 	})
 	return err
-}
-
-func (w *LocalWatcher) Close() {
-	w.stop <- true
 }
 
 func init() {

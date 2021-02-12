@@ -4,20 +4,27 @@ import (
 	"encoding/json"
 )
 
+// Bool is an alias for the standard boolean type with Unmarshal/Marshal functions
 type Bool bool
 
-func (bit *Bool) UnmarshalJSON(b []byte) error {
+// UnmarshalJSON allows to unmarshal from string to bool
+func (b *Bool) UnmarshalJSON(s []byte) error {
 	var txt string
-	err := json.Unmarshal(b, &txt)
+	err := json.Unmarshal(s, &txt)
 	if err != nil {
 		return err
 	}
-	*bit = Bool(txt == "1" || txt == "true")
+	if txt == "1" || txt == "true" {
+		*b = Bool(true)
+	} else {
+		*b = Bool(false)
+	}
 	return nil
 }
 
-func (bit *Bool) MarshalJSON() ([]byte, error) {
-	if *bit {
+// MarshalJSON allows the conversion from bool to string
+func (b Bool) MarshalJSON() ([]byte, error) {
+	if b {
 		return []byte("true"), nil
 	}
 	return []byte("false"), nil
