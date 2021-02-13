@@ -228,41 +228,41 @@ func (w *GDriveWatcher) enumerateFiles(prefix string, callback func(object *GDri
 		w.initDriverClient()
 	}
 
-	fileList := make(map[string]*drive.File)
-
 	err := w.client.Files.List().Fields("nextPageToken, files(id, name, mimeType, modifiedTime, parents, size, md5Checksum, trashed)").Pages(context.Background(), func(files *drive.FileList) error {
+		fileList := make(map[string]*drive.File)
+
+		// we need to map all the files with their id to construct the file tree
 		for _, f := range files.Files {
 			fileList[f.Id] = f
 		}
 
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("unable to retrieve files: %v", err)
-	}
-
-	for _, file := range fileList {
-		if file.MimeType != "application/vnd.google-apps.folder" && !file.Trashed {
-			for _, name := range w.getFullPaths(file, fileList) {
-				mt, e := time.Parse(time.RFC3339, file.ModifiedTime)
-				if err != nil {
-					w.Errors <- e
-					continue
-				}
-				if strings.HasPrefix(name, prefix) {
-					o := &GDriveObject{
-						ID:           file.Id,
-						Key:          name,
-						Size:         file.Size,
-						LastModified: mt,
-						Hash:         file.Md5Checksum,
+		for _, file := range fileList {
+			if file.MimeType != "application/vnd.google-apps.folder" && !file.Trashed {
+				for _, name := range w.getFullPaths(file, fileList) {
+					mt, err := time.Parse(time.RFC3339, file.ModifiedTime)
+					if err != nil {
+						w.Errors <- err
+						continue
 					}
-					if callback(o) == false {
-						break
+					if strings.HasPrefix(name, prefix) {
+						o := &GDriveObject{
+							ID:           file.Id,
+							Key:          name,
+							Size:         file.Size,
+							LastModified: mt,
+							Hash:         file.Md5Checksum,
+						}
+						if callback(o) == false {
+							break
+						}
 					}
 				}
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("unable to retrieve files: %v", err)
 	}
 	return nil
 }
