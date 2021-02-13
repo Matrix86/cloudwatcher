@@ -1,7 +1,7 @@
 # Cloudwatcher
+![Release](https://github.com/Matrix86/cloudwatcher/workflows/Release/badge.svg)
 ![GitHub](https://img.shields.io/github/license/Matrix86/cloudwatcher) 
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/Matrix86/cloudwatcher)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/Matrix86/cloudwatcher)
 ![Codecov](https://img.shields.io/codecov/c/github/Matrix86/cloudwatcher)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Matrix86/cloudwatcher/Build%20and%20Test)
 
