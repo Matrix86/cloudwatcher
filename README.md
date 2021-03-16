@@ -30,6 +30,7 @@ import (
 )
 
 func main() {
+    // the first parameter is the type of service to use: local, dropbox, gdrive or s3
 	s, err := cloudwatcher.New("local", "/home/user/tests", time.Second)
 	if err != nil {
 		fmt.Printf("ERROR: %s", err)
