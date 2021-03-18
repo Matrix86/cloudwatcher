@@ -12,6 +12,7 @@ Currently it implements the watchers for the following services:
 - Amazon S3
 - Google Drive
 - Dropbox
+- Git
 - local filesystem (fsnotify/polling)
 
 It is possible specify the directory to monitor and the polling time (how much often the watcher should check that directory), 
@@ -125,3 +126,25 @@ It is not mandatory to call the `SetConfig()` function, and the polling time arg
 Setting `disable_fsnotify` parameter on config to "true" the watcher doesn't use fsnotify and use the listing approach instead.
 
 > :warning: not set `disable_fsnotify` to "true" if you plan to use it on a big directory!!! It could increase the I/O on disk
+
+## Git
+
+Git watcher has the following configurations:
+
+| Name | Description 
+| --- | --- |
+| `debug` | if "true" the debug mode is enabled (default "false") |
+| `monitor_type` | it can be "file" or "repo" (default is "repo") |
+| `auth_type` | authentication type to use: "none", "ssh", "http_token", "http_user_pass" (default "none") |
+| `ssh_pkey` | path of the ssh private key (required if auth_type = "ssh") |
+| `ssh_pkey_password` | password of the private key if set |
+| `http_token` | token to use if auth_type = "http_token" |
+| `http_username` | username of github account (auth_type = "http_user_pass") |
+| `http_password` | password of github account (auth_type = "http_user_pass") |
+| `repo_url` | url of the repository |
+| `repo_branch` | branch to watch (if `monitor_type` is "repo" you can leave it empty to watch all the branches) |
+| `assemble_events` | if "true" the events could contain one or more commit events (only if `monitor_type` = "repo") |
+| `temp_dir` | temporary directory to use for clone the repo: if empty the tmp dir will be used |
+
+If `monitor_type` is set to "repo", the event channel will receive an event with the `Object` field filled with commits or tags.
+If `assemble_events` is "true" the `Object` field could contains one or more commits.
