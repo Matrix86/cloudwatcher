@@ -55,5 +55,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: release --rm-dist --release-notes .github/CHANGELOG.md
+          args: release --rm-dist --release-notes .github/CHANGELOG.md --debug
           workdir: .
