@@ -136,7 +136,6 @@ func (w *GDriveWatcher) sync() {
 		if cached != nil {
 			// Check if the LastModified has been changed
 			if !cached.LastModified.Equal(obj.LastModified) || cached.Hash != obj.Hash {
-				fmt.Printf("cached %s obj %s\n", cached.LastModified, obj.LastModified)
 				event := Event{
 					Key:    obj.Key,
 					Type:   FileChanged,
