@@ -20,4 +20,4 @@ vendor/
 
 .idea/
 
-bin/
+bin/dist/
