@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go v0.76.0 // indirect
 	github.com/dropbox/dropbox-sdk-go-unofficial v5.6.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/go-git/go-git/v5 v5.2.0 // indirect
+	github.com/go-git/go-git/v5 v5.2.0
 	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/minio/md5-simd v1.1.1 // indirect
