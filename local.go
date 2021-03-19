@@ -82,11 +82,11 @@ func (w *LocalWatcher) Start() error {
 		w.ticker = time.NewTicker(w.pollingTime)
 		go func() {
 			// launch synchronization also the first time
-			w.sync()
+			w.sync(true)
 			for {
 				select {
 				case <-w.ticker.C:
-					w.sync()
+					w.sync(false)
 
 				case <-w.stop:
 					close(w.Events)
@@ -203,7 +203,7 @@ func (w *LocalWatcher) Close() {
 	w.stop <- true
 }
 
-func (w *LocalWatcher) sync() {
+func (w *LocalWatcher) sync(firstSync bool) {
 	// allow only one sync at same time
 	if !atomic.CompareAndSwapUint32(&w.syncing, 0, 1) {
 		return
@@ -233,40 +233,42 @@ func (w *LocalWatcher) sync() {
 			FileMode:     fi.Mode(),
 		}
 
-		fileList[walkPath] = obj
+		if firstSync {
+			fileList[walkPath] = obj
 
-		// Check if the object is cached by Key
-		cached := w.getCachedObject(obj)
-		// Object has been cached previously by Key
-		if cached != nil {
-			// Check if the LastModified has been changed
-			if !cached.LastModified.Equal(obj.LastModified) || (cached.Size != obj.Size) {
+			// Check if the object is cached by Key
+			cached := w.getCachedObject(obj)
+			// Object has been cached previously by Key
+			if cached != nil {
+				// Check if the LastModified has been changed
+				if !cached.LastModified.Equal(obj.LastModified) || (cached.Size != obj.Size) {
+					event := Event{
+						Key:    obj.Key,
+						Type:   FileChanged,
+						Object: obj,
+					}
+					w.Events <- event
+				}
+				// Check if the file modes have been updated
+				if cached.FileMode != obj.FileMode {
+					event := Event{
+						Key:    obj.Key,
+						Type:   TagsChanged,
+						Object: obj,
+					}
+					w.Events <- event
+				}
+			} else {
 				event := Event{
 					Key:    obj.Key,
-					Type:   FileChanged,
+					Type:   FileCreated,
 					Object: obj,
 				}
 				w.Events <- event
 			}
-			// Check if the file modes have been updated
-			if cached.FileMode != obj.FileMode {
-				event := Event{
-					Key:    obj.Key,
-					Type:   TagsChanged,
-					Object: obj,
-				}
-				w.Events <- event
-			}
-		} else {
-			event := Event{
-				Key:    obj.Key,
-				Type:   FileCreated,
-				Object: obj,
-			}
-			w.Events <- event
 		}
-		w.cache[obj.Key] = obj
 
+		w.cache[obj.Key] = obj
 		return nil
 	})
 	if err != nil {
@@ -274,16 +276,18 @@ func (w *LocalWatcher) sync() {
 		return
 	}
 
-	for k, o := range w.cache {
-		if _, found := fileList[k]; !found {
-			// file not found in the list...deleting it
-			delete(w.cache, k)
-			event := Event{
-				Key:    o.Key,
-				Type:   FileDeleted,
-				Object: o,
+	if len(fileList) != 0 {
+		for k, o := range w.cache {
+			if _, found := fileList[k]; !found {
+				// file not found in the list...deleting it
+				delete(w.cache, k)
+				event := Event{
+					Key:    o.Key,
+					Type:   FileDeleted,
+					Object: o,
+				}
+				w.Events <- event
 			}
-			w.Events <- event
 		}
 	}
 }

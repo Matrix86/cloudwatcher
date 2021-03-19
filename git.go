@@ -139,11 +139,11 @@ func (w *GitWatcher) Start() error {
 	w.ticker = time.NewTicker(w.pollingTime)
 	go func() {
 		// launch synchronization also the first time
-		w.sync()
+		w.sync(true)
 		for {
 			select {
 			case <-w.ticker.C:
-				w.sync()
+				w.sync(false)
 
 			case <-w.stop:
 				close(w.Events)
@@ -169,7 +169,7 @@ func (w *GitWatcher) getCachedObject(o *GitObject) *GitObject {
 	return nil
 }
 
-func (w *GitWatcher) sync() {
+func (w *GitWatcher) sync(firstSync bool) {
 	// allow only one sync at same time
 	if !atomic.CompareAndSwapUint32(&w.syncing, 0, 1) {
 		return
@@ -184,13 +184,17 @@ func (w *GitWatcher) sync() {
 
 	// default behaviour is file
 	if w.config.MonitorType == "repo" {
-		// if we don't have commits in the cache this is the first time it is being executed
-		firstSync := len(w.branchCache) == 0
 		w.checkCommits(firstSync)
 		w.checkTags(firstSync)
 	} else {
 		fileList := make(map[string]*GitObject, 0)
 		err := w.enumerateFiles(w.watchDir, func(obj *GitObject) bool {
+			// With the first sync we need to cache all the files
+			if firstSync {
+				w.fileCache[obj.Key] = obj
+				return true
+			}
+
 			// Store the files to check the deleted one
 			fileList[obj.Key] = obj
 			// Check if the object is cached by Key

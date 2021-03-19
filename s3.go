@@ -99,11 +99,11 @@ func (u *S3Watcher) Start() error {
 	u.ticker = time.NewTicker(u.pollingTime)
 	go func() {
 		// launch synchronization also the first time
-		u.sync()
+		u.sync(true)
 		for {
 			select {
 			case <-u.ticker.C:
-				u.sync()
+				u.sync(false)
 
 			case <-u.stop:
 				close(u.Events)
@@ -147,7 +147,7 @@ func (u *S3Object) areTagsChanged(new *S3Object) bool {
 	return false
 }
 
-func (u *S3Watcher) sync() {
+func (u *S3Watcher) sync(firstSync bool) {
 	// allow only one sync at same time
 	if !atomic.CompareAndSwapUint32(&u.syncing, 0, 1) {
 		return
@@ -168,41 +168,43 @@ func (u *S3Watcher) sync() {
 			return true // continue
 		}
 
-		// Store the files to check the deleted one
-		fileList[upd.Key] = upd
+		if !firstSync {
+			// Store the files to check the deleted one
+			fileList[upd.Key] = upd
 
-		// Check if the object is cached by Key
-		cached := u.getCachedObject(upd)
-		// Object has been cached previously by Key
-		if cached != nil {
-			// Check if the LastModified has been changed
-			if !cached.LastModified.Equal(upd.LastModified) || cached.Size != upd.Size {
+			// Check if the object is cached by Key
+			cached := u.getCachedObject(upd)
+			// Object has been cached previously by Key
+			if cached != nil {
+				// Check if the LastModified has been changed
+				if !cached.LastModified.Equal(upd.LastModified) || cached.Size != upd.Size {
+					event := Event{
+						Key:    upd.Key,
+						Type:   FileChanged,
+						Object: upd,
+					}
+					u.Events <- event
+				}
+				// Check if the tags have been updated
+				if cached.areTagsChanged(upd) {
+					event := Event{
+						Key:    upd.Key,
+						Type:   TagsChanged,
+						Object: upd,
+					}
+					u.Events <- event
+				}
+			} else {
 				event := Event{
 					Key:    upd.Key,
-					Type:   FileChanged,
+					Type:   FileCreated,
 					Object: upd,
 				}
 				u.Events <- event
 			}
-			// Check if the tags have been updated
-			if cached.areTagsChanged(upd) {
-				event := Event{
-					Key:    upd.Key,
-					Type:   TagsChanged,
-					Object: upd,
-				}
-				u.Events <- event
-			}
-		} else {
-			event := Event{
-				Key:    upd.Key,
-				Type:   FileCreated,
-				Object: upd,
-			}
-			u.Events <- event
 		}
-		u.cache[upd.Key] = upd
 
+		u.cache[upd.Key] = upd
 		return true
 	})
 	if err != nil {

@@ -95,11 +95,11 @@ func (w *GDriveWatcher) Start() error {
 	w.ticker = time.NewTicker(w.pollingTime)
 	go func() {
 		// launch synchronization also the first time
-		w.sync()
+		w.sync(true)
 		for {
 			select {
 			case <-w.ticker.C:
-				w.sync()
+				w.sync(false)
 
 			case <-w.stop:
 				close(w.Events)
@@ -118,7 +118,7 @@ func (w *GDriveWatcher) Close() {
 	}
 }
 
-func (w *GDriveWatcher) sync() {
+func (w *GDriveWatcher) sync(firstSync bool) {
 	// allow only one sync at same time
 	if !atomic.CompareAndSwapUint32(&w.syncing, 0, 1) {
 		return
@@ -128,28 +128,31 @@ func (w *GDriveWatcher) sync() {
 	fileList := make(map[string]*GDriveObject, 0)
 
 	err := w.enumerateFiles(w.watchDir, func(obj *GDriveObject) bool {
-		// Store the files to check the deleted one
-		fileList[obj.ID] = obj
-		// Check if the object is cached by Key
-		cached := w.getCachedObject(obj)
-		// Object has been cached previously by Key
-		if cached != nil {
-			// Check if the LastModified has been changed
-			if !cached.LastModified.Equal(obj.LastModified) || cached.Hash != obj.Hash {
+		// With the first sync we need to cache all the files
+		if !firstSync {
+			// Store the files to check the deleted one
+			fileList[obj.ID] = obj
+			// Check if the object is cached by Key
+			cached := w.getCachedObject(obj)
+			// Object has been cached previously by Key
+			if cached != nil {
+				// Check if the LastModified has been changed
+				if !cached.LastModified.Equal(obj.LastModified) || cached.Hash != obj.Hash {
+					event := Event{
+						Key:    obj.Key,
+						Type:   FileChanged,
+						Object: obj,
+					}
+					w.Events <- event
+				}
+			} else {
 				event := Event{
 					Key:    obj.Key,
-					Type:   FileChanged,
+					Type:   FileCreated,
 					Object: obj,
 				}
 				w.Events <- event
 			}
-		} else {
-			event := Event{
-				Key:    obj.Key,
-				Type:   FileCreated,
-				Object: obj,
-			}
-			w.Events <- event
 		}
 		w.cache[obj.ID] = obj
 		return true
