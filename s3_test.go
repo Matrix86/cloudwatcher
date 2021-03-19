@@ -118,7 +118,7 @@ func TestS3Watcher_Start(t *testing.T) {
 		// we need to overwrite the client after the call to SetConfig
 		sw.client = m
 
-		sw.sync()
+		sw.sync(false)
 
 		// wrong bucket
 		select {
@@ -166,7 +166,7 @@ func TestS3Watcher_Start(t *testing.T) {
 			nil,
 		)
 
-		sw.sync()
+		sw.sync(false)
 		select {
 		case event = <-d.GetEvents():
 		case <-time.After(1 * time.Second):
@@ -210,7 +210,7 @@ func TestS3Watcher_Start(t *testing.T) {
 			nil,
 		)
 
-		sw.sync()
+		sw.sync(false)
 		select {
 		case event = <-d.GetEvents():
 		case <-time.After(1 * time.Second):
@@ -252,7 +252,7 @@ func TestS3Watcher_Start(t *testing.T) {
 			tag,
 			nil,
 		)
-		sw.sync()
+		sw.sync(false)
 		select {
 		case event = <-d.GetEvents():
 		case <-time.After(1 * time.Second):
@@ -295,7 +295,7 @@ func TestS3Watcher_Start(t *testing.T) {
 			tag,
 			nil,
 		)
-		sw.sync()
+		sw.sync(false)
 		select {
 		case event = <-d.GetEvents():
 		case <-time.After(1 * time.Second):
@@ -323,7 +323,7 @@ func TestS3Watcher_Start(t *testing.T) {
 			},
 		)
 
-		sw.sync()
+		sw.sync(false)
 		select {
 		case event = <-d.GetEvents():
 		case <-time.After(1 * time.Second):

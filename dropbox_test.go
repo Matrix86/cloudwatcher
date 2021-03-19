@@ -91,9 +91,11 @@ func TestDropboxWatcher_Start(t *testing.T) {
 				Entries: []files.IsMetadata{files.NewFileMetadata("name", "Id", modtime, modtime, "1", 120)},
 				Cursor:  "",
 				HasMore: false,
-			}, nil)
+			},
+			nil,
+		)
 
-		dw.sync()
+		dw.sync(false)
 		event = <-dw.GetEvents()
 
 		if event.Key != "name" {
@@ -109,7 +111,7 @@ func TestDropboxWatcher_Start(t *testing.T) {
 				Cursor:  "",
 				HasMore: false,
 			}, nil)
-		dw.sync()
+		dw.sync(false)
 
 		// File modified : size changed
 		m.EXPECT().ListFolder(arg).Return(
@@ -118,7 +120,7 @@ func TestDropboxWatcher_Start(t *testing.T) {
 				Cursor:  "",
 				HasMore: false,
 			}, nil)
-		dw.sync()
+		dw.sync(false)
 		event = <-dw.GetEvents()
 
 		if event.Key != "name" {
@@ -134,7 +136,7 @@ func TestDropboxWatcher_Start(t *testing.T) {
 				Cursor:  "",
 				HasMore: false,
 			}, nil)
-		dw.sync()
+		dw.sync(false)
 		event = <-dw.GetEvents()
 
 		if event.Key != "name" {
@@ -150,7 +152,7 @@ func TestDropboxWatcher_Start(t *testing.T) {
 				Cursor:  "",
 				HasMore: false,
 			}, nil)
-		dw.sync()
+		dw.sync(false)
 		event = <-dw.GetEvents()
 
 		if event.Key != "name" {
