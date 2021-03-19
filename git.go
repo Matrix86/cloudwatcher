@@ -37,9 +37,12 @@ type GitWatcher struct {
 
 // GitCommit is the object that contains the info about the commit
 type GitCommit struct {
-	Hash    string
-	Message string
-	Branch  string
+	Hash        string
+	Message     string
+	Branch      string
+	AuthorName  string
+	AuthorEmail string
+	Time        time.Time
 }
 
 // GitObject is the object that contains the info of the file
@@ -288,9 +291,12 @@ func (w *GitWatcher) checkCommits(disableNotification bool) {
 				}
 
 				commit := &GitCommit{
-					Hash:    c.Hash.String(),
-					Message: c.Message,
-					Branch:  branch,
+					Hash:        c.Hash.String(),
+					Message:     c.Message,
+					AuthorName:  c.Author.Name,
+					AuthorEmail: c.Author.Email,
+					Time:        c.Author.When,
+					Branch:      branch,
 				}
 				commits = append(commits, commit)
 			} else {
@@ -298,9 +304,12 @@ func (w *GitWatcher) checkCommits(disableNotification bool) {
 				// Storing only the last commit's hash because
 				// we can't know from what other branch it comes
 				commit := &GitCommit{
-					Hash:    c.Hash.String(),
-					Message: c.Message,
-					Branch:  branch,
+					Hash:        c.Hash.String(),
+					Message:     c.Message,
+					AuthorName:  c.Author.Name,
+					AuthorEmail: c.Author.Email,
+					Time:        c.Author.When,
+					Branch:      branch,
 				}
 				commits = append(commits, commit)
 				return errExitFromLoop
