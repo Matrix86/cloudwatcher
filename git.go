@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -26,6 +27,7 @@ type GitWatcher struct {
 	syncing uint32
 
 	repository *git.Repository
+	auth       transport.AuthMethod
 
 	ticker      *time.Ticker
 	stop        chan bool
@@ -442,19 +444,20 @@ func (w *GitWatcher) updateRepo() error {
 
 		case "http_token":
 			opts.Auth = &http.BasicAuth{
-				Username: "token",
+				Username: w.config.HTTPUsername,
 				Password: w.config.HTTPToken,
 			}
 
 		case "http_user_pass":
 			opts.Auth = &http.BasicAuth{
-				Username: w.config.HTTPPassword,
-				Password: w.config.HTTPToken,
+				Username: w.config.HTTPUsername,
+				Password: w.config.HTTPPassword,
 			}
 
 		default:
 
 		}
+		w.auth = opts.Auth
 
 		r, err := git.PlainClone(w.config.TempDir, false, opts)
 		if err != nil && err == git.ErrRepositoryAlreadyExists {
@@ -472,9 +475,11 @@ func (w *GitWatcher) updateRepo() error {
 	}
 
 	// Update the repository
-	err = wt.Pull(&git.PullOptions{})
+	err = wt.Pull(&git.PullOptions{
+		Auth: w.auth,
+	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return fmt.Errorf("checkout of repo '%s': %s", w.config.RepoBranch, err)
+		return fmt.Errorf("checkout of repo '%s': %s", w.config.RepoURL, err)
 	}
 	return nil
 }
