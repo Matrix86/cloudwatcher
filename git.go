@@ -443,6 +443,10 @@ func (w *GitWatcher) updateRepo() error {
 			opts.Auth = publicKeys
 
 		case "http_token":
+			// token auth ignores the username but it cannot be empty 
+			if w.config.HTTPUsername == "" {
+				w.config.HTTPUsername = "token"
+			}
 			opts.Auth = &http.BasicAuth{
 				Username: w.config.HTTPUsername,
 				Password: w.config.HTTPToken,
