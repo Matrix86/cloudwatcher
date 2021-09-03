@@ -142,9 +142,10 @@ func (w *DropboxWatcher) sync(firstSync bool) {
 
 	fileList := make(map[string]*DropboxObject, 0)
 	err := w.enumerateFiles(w.watchDir, func(obj *DropboxObject) bool {
+		// Store the files to check the deleted one
+		fileList[obj.Key] = obj
+
 		if !firstSync {
-			// Store the files to check the deleted one
-			fileList[obj.Key] = obj
 			// Check if the object is cached by Key
 			cached := w.getCachedObject(obj)
 			// Object has been cached previously by Key

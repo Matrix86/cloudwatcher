@@ -233,9 +233,9 @@ func (w *LocalWatcher) sync(firstSync bool) {
 			FileMode:     fi.Mode(),
 		}
 
-		if !firstSync {
-			fileList[walkPath] = obj
+		fileList[walkPath] = obj
 
+		if !firstSync {
 			// Check if the object is cached by Key
 			cached := w.getCachedObject(obj)
 			// Object has been cached previously by Key
@@ -276,18 +276,16 @@ func (w *LocalWatcher) sync(firstSync bool) {
 		return
 	}
 
-	if len(fileList) != 0 {
-		for k, o := range w.cache {
-			if _, found := fileList[k]; !found {
-				// file not found in the list...deleting it
-				delete(w.cache, k)
-				event := Event{
-					Key:    o.Key,
-					Type:   FileDeleted,
-					Object: o,
-				}
-				w.Events <- event
+	for k, o := range w.cache {
+		if _, found := fileList[k]; !found {
+			// file not found in the list...deleting it
+			delete(w.cache, k)
+			event := Event{
+				Key:    o.Key,
+				Type:   FileDeleted,
+				Object: o,
 			}
+			w.Events <- event
 		}
 	}
 }

@@ -128,10 +128,10 @@ func (w *GDriveWatcher) sync(firstSync bool) {
 	fileList := make(map[string]*GDriveObject, 0)
 
 	err := w.enumerateFiles(w.watchDir, func(obj *GDriveObject) bool {
+		// Store the files to check the deleted one
+		fileList[obj.ID] = obj
 		// With the first sync we need to cache all the files
 		if !firstSync {
-			// Store the files to check the deleted one
-			fileList[obj.ID] = obj
 			// Check if the object is cached by Key
 			cached := w.getCachedObject(obj)
 			// Object has been cached previously by Key

@@ -168,10 +168,10 @@ func (u *S3Watcher) sync(firstSync bool) {
 			return true // continue
 		}
 
-		if !firstSync {
-			// Store the files to check the deleted one
-			fileList[upd.Key] = upd
+		// Store the files to check the deleted one
+		fileList[upd.Key] = upd
 
+		if !firstSync {
 			// Check if the object is cached by Key
 			cached := u.getCachedObject(upd)
 			// Object has been cached previously by Key
@@ -212,16 +212,18 @@ func (u *S3Watcher) sync(firstSync bool) {
 		return
 	}
 
-	for k, o := range u.cache {
-		if _, found := fileList[k]; !found {
-			// file not found in the list...deleting it
-			delete(u.cache, k)
-			event := Event{
-				Key:    o.Key,
-				Type:   FileDeleted,
-				Object: o,
+	if !firstSync {
+		for k, o := range u.cache {
+			if _, found := fileList[k]; !found {
+				// file not found in the list...deleting it
+				delete(u.cache, k)
+				event := Event{
+					Key:    o.Key,
+					Type:   FileDeleted,
+					Object: o,
+				}
+				u.Events <- event
 			}
-			u.Events <- event
 		}
 	}
 }
