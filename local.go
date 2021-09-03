@@ -233,7 +233,7 @@ func (w *LocalWatcher) sync(firstSync bool) {
 			FileMode:     fi.Mode(),
 		}
 
-		if firstSync {
+		if !firstSync {
 			fileList[walkPath] = obj
 
 			// Check if the object is cached by Key
