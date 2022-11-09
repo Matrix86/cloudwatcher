@@ -14,13 +14,18 @@ import (
 
 type objectInfo = minio.ObjectInfo
 type s3Configuration struct {
-	BucketName      string `json:"bucket_name"`
-	Endpoint        string `json:"endpoint"`
-	AccessKey       string `json:"access_key"`
-	SecretAccessKey string `json:"secret_key"`
-	SessionToken    string `json:"token"`
-	Region          string `json:"region"`
-	SSLEnabled      Bool   `json:"ssl_enabled"`
+	BucketName           string `json:"bucket_name"`
+	Endpoint             string `json:"endpoint"`
+	AccessKey            string `json:"access_key"`
+	SecretAccessKey      string `json:"secret_key"`
+	SessionToken         string `json:"token"`
+	Region               string `json:"region"`
+	SSLEnabled           Bool   `json:"ssl_enabled"`
+	UseAWSIAMCredentials Bool   `json:"aws_iam_credentials"`
+	AWSIAMEndpoint       string `json:"aws_iam_endpoint"`
+	UseAWSFile           Bool   `json:"aws_file"`
+	AWSFileName          string `json:"aws_file_name"`
+	AWSFileProfile       string `json:"aws_file_profile"`
 }
 
 // S3Watcher is the specialized watcher for Amazon S3 service
@@ -73,10 +78,17 @@ func (u *S3Watcher) SetConfig(m map[string]string) error {
 	}
 	u.config = &config
 
-	client, err := minio.New(u.config.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(u.config.AccessKey, u.config.SecretAccessKey, u.config.SessionToken),
+	options := minio.Options{
 		Secure: bool(u.config.SSLEnabled),
-	})
+	}
+
+	if u.config.UseAWSFile {
+		options.Creds = credentials.NewFileAWSCredentials(u.config.AWSFileName, u.config.AWSFileProfile)
+	} else if u.config.UseAWSIAMCredentials {
+		options.Creds = credentials.NewIAM(u.config.AWSIAMEndpoint)
+	}
+
+	client, err := minio.New(u.config.Endpoint, &options)
 	if err != nil {
 		return err
 	}

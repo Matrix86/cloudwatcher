@@ -83,6 +83,15 @@ config := map[string]string{
 }
 ```
 
+To use [AWS IAM credentials or AWS file](https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials), it is possible to set one of the following vars to "`true`": `aws_iam_credentials`, `aws_file`.
+It is also possible to specify the IAM endpoint (`aws_file_profile`) or the path of the file to use (`aws_file_profile`), if not specified it will use the default endpoint and file ($HOME/.aws/credentials).
+
+```go
+config := map[string]string{
+    "aws_file_profile": "true",
+}
+```
+
 An example can be found [here](examples/s3/s3.go).
 
 > :gem: [minio](https://docs.min.io/docs/minio-quickstart-guide.html) can be used for testing purposes
