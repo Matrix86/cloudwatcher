@@ -86,6 +86,8 @@ func (u *S3Watcher) SetConfig(m map[string]string) error {
 		options.Creds = credentials.NewFileAWSCredentials(u.config.AWSFileName, u.config.AWSFileProfile)
 	} else if u.config.UseAWSIAMCredentials {
 		options.Creds = credentials.NewIAM(u.config.AWSIAMEndpoint)
+	} else {
+		options.Creds = credentials.NewStaticV4(u.config.AccessKey, u.config.SecretAccessKey, u.config.SessionToken)
 	}
 
 	client, err := minio.New(u.config.Endpoint, &options)
