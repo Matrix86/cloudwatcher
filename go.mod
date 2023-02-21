@@ -1,6 +1,6 @@
 module github.com/Matrix86/cloudwatcher
 
-go 1.18
+go 1.19
 
 require (
 	github.com/dropbox/dropbox-sdk-go-unofficial v5.6.0+incompatible

@@ -14,7 +14,7 @@ coverage:
 	@go test -coverprofile=cover.out . && go tool cover -html=cover.out
 
 lint:
-	@golint -set_exit_status .
+	@$(shell go env GOPATH)/bin/golangci-lint -v run .
 
 build-tests: clean
 	@mkdir -p bin

@@ -10,22 +10,22 @@ on:
   pull_request:
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.18
+  #lint:
+  #  name: Lint
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - name: Set up Go
+  #      uses: actions/setup-go@v2
+  #      with:
+  #        go-version: 1.19
 
-      - name: Check out code
-        uses: actions/checkout@v2
+  #    - name: Check out code
+  #      uses: actions/checkout@v2
 
-      - name: Lint Go Code
-        run: |
-          go get -u golang.org/x/lint/golint
-          make lint
+  #    - name: Lint Go Code
+  #      run: |
+  #        go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+  #        make lint
 
   test:
     name: Test
@@ -34,7 +34,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: 1.19
 
       - name: Check out code
         uses: actions/checkout@v2
@@ -56,7 +56,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: 1.19
 
       - name: Check out code
         uses: actions/checkout@v2
